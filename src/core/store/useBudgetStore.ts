@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Item, BudgetSession } from '../../shared/types';
+import { Item, BudgetSession, PlannedItem } from '../../shared/types';
 import { zustandStorage } from '../../storage/zustandStorage';
 
 interface BudgetState {
   session: BudgetSession | null;
   items: Item[];
   lastDeletedItem: Item | null;
+  plannedItems: PlannedItem[];
+  previousGroceries: Item[];
 
   // Actions
   setBudget: (amount: number) => void;
@@ -15,6 +17,11 @@ interface BudgetState {
   undoDelete: () => void;
   clearAll: () => void;
   clearSession: () => void;
+
+  addPlannedItem: (name: string) => void;
+  removePlannedItem: (id: string) => void;
+  clearPlannedItems: () => void;
+  importPlannedItems: (items: PlannedItem[]) => void;
 }
 
 const computeTotals = (items: Item[]) => {
@@ -27,6 +34,8 @@ export const useBudgetStore = create<BudgetState>()(
       session: null,
       items: [],
       lastDeletedItem: null,
+      plannedItems: [],
+      previousGroceries: [],
 
       setBudget: (amount: number) => {
         set((state) => ({
@@ -108,11 +117,42 @@ export const useBudgetStore = create<BudgetState>()(
       },
 
       clearSession: () => {
-        set({
+        set((state) => ({
           session: null,
+          previousGroceries: state.items.length > 0 ? [...state.items] : state.previousGroceries,
           items: [],
           lastDeletedItem: null,
-        });
+          plannedItems: [],
+        }));
+      },
+
+      addPlannedItem: (name: string) => {
+        set((state) => ({
+          plannedItems: [
+            ...state.plannedItems,
+            {
+              id: Date.now().toString() + Math.random().toString(36).substring(7),
+              name: name.trim(),
+              createdAt: new Date().toISOString(),
+            }
+          ]
+        }));
+      },
+
+      removePlannedItem: (id: string) => {
+        set((state) => ({
+          plannedItems: state.plannedItems.filter((i) => i.id !== id)
+        }));
+      },
+
+      clearPlannedItems: () => {
+        set({ plannedItems: [] });
+      },
+
+      importPlannedItems: (items: PlannedItem[]) => {
+        set((state) => ({
+          plannedItems: [...state.plannedItems, ...items]
+        }));
       },
     }),
     {

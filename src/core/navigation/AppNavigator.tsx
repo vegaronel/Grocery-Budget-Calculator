@@ -2,13 +2,13 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { BudgetSetupScreen } from '../../features/budget/screens/BudgetSetupScreen';
-import { MainDashboardScreen } from '../../features/items/screens/MainDashboardScreen';
 import { ScannerScreen } from '../../features/items/screens/ScannerScreen';
+import { TabNavigator } from './TabNavigator';
 import { useBudgetStore } from '../store/useBudgetStore';
 
 export type RootStackParamList = {
   BudgetSetup: undefined;
-  MainDashboard: { scannedName?: string };
+  MainTabs: { screen: string; params?: any };
   Scanner: undefined;
 };
 
@@ -24,7 +24,7 @@ export const AppNavigator = () => {
           <Stack.Screen name="BudgetSetup" component={BudgetSetupScreen} />
         ) : (
           <Stack.Group>
-            <Stack.Screen name="MainDashboard" component={MainDashboardScreen} />
+            <Stack.Screen name="MainTabs" component={TabNavigator} />
             <Stack.Screen name="Scanner" component={ScannerScreen} />
           </Stack.Group>
         )}

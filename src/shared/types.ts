@@ -13,3 +13,9 @@ export interface BudgetSession {
   totalSpent: number;
   createdAt: string;
 }
+
+export interface PlannedItem {
+  id: string;
+  name: string;
+  createdAt: string;
+}

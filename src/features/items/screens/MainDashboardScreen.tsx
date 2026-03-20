@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Vibration, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBudgetStore } from '../../../core/store/useBudgetStore';
@@ -10,8 +10,34 @@ import { ProgressBar } from '../../../shared/components/ProgressBar';
 import { Item } from '../../../shared/types';
 import { getIconForItem } from '../../../shared/utils/icons';
 import * as Haptics from 'expo-haptics';
+import { CompositeScreenProps } from '@react-navigation/native';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { BottomTabParamList } from '../../../core/navigation/TabNavigator';
 import { RootStackParamList } from '../../../core/navigation/AppNavigator';
+
+const isFuzzyMatch = (plannedStr: string, scannedStr: string) => {
+  if (!plannedStr || !scannedStr) return false;
+  const pWords = plannedStr.toLowerCase().split(/[\s,.-]+/);
+  // Remove common generic words they might type
+  const filterWords = ['a', 'an', 'the', 'pack', 'kg', 'g', 'ml', 'pcs'];
+  const validPWords = pWords.filter(w => w.length > 1 && !filterWords.includes(w));
+  
+  if (validPWords.length === 0) return false;
+
+  const sStrLower = scannedStr.toLowerCase();
+  
+  // Count how many significant planned words exist natively inside the scanned barcode result
+  let matchCount = 0;
+  for (const pWord of validPWords) {
+    if (sStrLower.includes(pWord)) {
+      matchCount++;
+    }
+  }
+  
+  // If at least 50% of the significant words they typed match the scanned name, it's a match
+  return (matchCount / validPWords.length) >= 0.5;
+};
 
 const QUICK_ADD_ITEMS = [
   { name: 'Milk', price: 95 },
@@ -21,10 +47,13 @@ const QUICK_ADD_ITEMS = [
   { name: 'Water', price: 40 },
 ];
 
-type Props = NativeStackScreenProps<RootStackParamList, 'MainDashboard'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<BottomTabParamList, 'Cart'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 export const MainDashboardScreen = ({ route, navigation }: Props) => {
-  const { session, items, addItem, deleteItem, clearAll, undoDelete, lastDeletedItem, clearSession } = useBudgetStore();
+  const { session, items, addItem, deleteItem, clearAll, undoDelete, lastDeletedItem, clearSession, removePlannedItem } = useBudgetStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [hasVibrated, setHasVibrated] = useState(false);
   const [selectedQuickAdd, setSelectedQuickAdd] = useState<{ name: string, price: string } | null>(null);
@@ -54,7 +83,26 @@ export const MainDashboardScreen = ({ route, navigation }: Props) => {
   // Handle incoming scanned items from ScannerScreen
   useEffect(() => {
     if (route.params?.scannedName) {
-      setSelectedQuickAdd({ name: route.params.scannedName, price: '' });
+      const scannedName = route.params.scannedName;
+      
+      // Auto-clear logic: Try to find a matching item in the planner
+      let matchedItem = null;
+      const plannedList = useBudgetStore.getState().plannedItems;
+      
+      for (const item of plannedList) {
+        if (isFuzzyMatch(item.name, scannedName)) {
+            matchedItem = item;
+            break;
+        }
+      }
+
+      if (matchedItem) {
+        removePlannedItem(matchedItem.id);
+        Alert.alert('Smart Match! ✨', `Automatically checked off '${matchedItem.name}' from your planner!`);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+      setSelectedQuickAdd({ name: scannedName, price: '' });
       setModalVisible(true);
       navigation.setParams({ scannedName: undefined });
     }
@@ -93,7 +141,7 @@ export const MainDashboardScreen = ({ route, navigation }: Props) => {
     setModalVisible(true);
   };
 
-  const renderItem = ({ item }: { item: Item }) => (
+  const renderItem = useCallback(({ item }: { item: Item }) => (
     <Card style={styles.itemCard}>
       <View style={styles.itemIconContainer}>
         <Text style={styles.itemIcon}>{getIconForItem(item.name)}</Text>
@@ -112,7 +160,7 @@ export const MainDashboardScreen = ({ route, navigation }: Props) => {
         </TouchableOpacity>
       </View>
     </Card>
-  );
+  ), []);
 
   return (
     <SafeAreaView style={styles.safeArea}>

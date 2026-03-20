@@ -53,11 +53,10 @@ export const ScannerScreen = ({ navigation }: Props) => {
         return;
       }
 
-      // Navigate back with the scanned name
-      navigation.navigate({
-        name: 'MainDashboard',
+      // Navigate back with the scanned name to the specific tab
+      navigation.navigate('MainTabs', {
+        screen: 'Cart',
         params: { scannedName: productName },
-        merge: true,
       });
     } catch (error) {
       console.error("Error fetching product:", error);
